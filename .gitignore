@@ -1,9 +1,6 @@
 # .gitignore
 # https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
-# Datadog Static Analysis
-static-analysis.datadog.yml
-
 # Ignore Visual Studio Code directories
 .vscode
 
