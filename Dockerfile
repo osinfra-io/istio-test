@@ -1,4 +1,4 @@
-FROM golang:1.23-alpine
+FROM golang:1.24-alpine
 
 # Ensure that HEALTHCHECK instructions have been added to container images
 # checkov:skip=CKV_DOCKER_2: Since Kubernetes 1.8, the Docker HEALTHCHECK has been disabled explicitly
