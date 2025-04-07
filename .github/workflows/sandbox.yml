@@ -29,7 +29,7 @@ jobs:
 
   build_and_push_us:
     name: "Sandbox Registry: us-docker.pkg.dev"
-    uses: osinfra-io/github-misc-called-workflows/.github/workflows/build-and-push.yml@v0.1.8
+    uses: osinfra-io/github-misc-called-workflows/.github/workflows/build-and-push.yml@v0.1.9
     if: github.actor != 'dependabot[bot]'
     needs: run_go_tests
     with:
