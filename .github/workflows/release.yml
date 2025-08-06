@@ -11,7 +11,7 @@ permissions:
 jobs:
   build_and_push_us:
     name: "Sandbox Registry: us-docker.pkg.dev"
-    uses: osinfra-io/github-misc-called-workflows/.github/workflows/build-and-push.yml@v0.2.0
+    uses: osinfra-io/github-misc-called-workflows/.github/workflows/build-and-push.yml@v0.2.1
     if: github.actor != 'dependabot[bot]'
     with:
       cache_from: type=registry,ref=us-docker.pkg.dev/plt-lz-services-tf7f-sb/plt-docker-standard/istio-test:latest
