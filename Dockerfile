@@ -1,8 +1,5 @@
 FROM golang:1.24-alpine
 
-# Ensure that HEALTHCHECK instructions have been added to container images
-# checkov:skip=CKV_DOCKER_2: Since Kubernetes 1.8, the Docker HEALTHCHECK has been disabled explicitly
-
 # Create a non-root user for security purposes
 
 RUN addgroup -S istio-test && adduser -S istio-test -G istio-test
