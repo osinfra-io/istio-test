@@ -7,10 +7,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
+	"istio-test/internal/config"
 	"istio-test/internal/metadata"
 	"istio-test/internal/observability"
+	"istio-test/internal/security"
 
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
@@ -21,42 +22,85 @@ import (
 func main() {
 	ctx := context.Background()
 
-	observability.Init()
+	// Load configuration
+	conf := config.Load()
+
+	// Validate configuration
+	if err := conf.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "Configuration validation failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	observability.Init(conf.Observability.LogLevel, observability.Config{
+		EnablePIIRedaction: conf.Observability.EnablePIIRedaction,
+	})
 
 	observability.InfoWithContext(ctx, "Application is starting")
 
-	tracer.Start(tracer.WithRuntimeMetrics())
-	defer tracer.Stop()
-
-	err := profiler.Start(
-		profiler.WithProfileTypes(
-			profiler.CPUProfile,
-			profiler.HeapProfile,
-		),
+	// Create security options once at startup for better performance
+	apiSecurityOptions := security.CustomSecurityOptions(
+		conf.Security.APICOEP,
+		conf.Security.APICOOP,
+		conf.Security.APICORP,
 	)
-	if err != nil {
-		observability.ErrorWithContext(ctx, fmt.Sprintf("Warning: Failed to start profiler: %v", err))
+
+	defaultSecurityOptions := security.CustomSecurityOptions(
+		conf.Security.DefaultCOEP,
+		conf.Security.DefaultCOOP,
+		conf.Security.DefaultCORP,
+	)
+
+	// Log security policy configuration for observability
+	observability.InfoWithContext(ctx, fmt.Sprintf("Security policies configured - API: COEP='%s' COOP='%s' CORP='%s', Default: COEP='%s' COOP='%s' CORP='%s'",
+		conf.Security.APICOEP, conf.Security.APICOOP, conf.Security.APICORP,
+		conf.Security.DefaultCOEP, conf.Security.DefaultCOOP, conf.Security.DefaultCORP))
+
+	if conf.Observability.EnableTracing {
+		tracer.Start(tracer.WithRuntimeMetrics())
+		defer tracer.Stop()
 	}
-	defer profiler.Stop()
+
+	if conf.Observability.EnableProfiler {
+		err := profiler.Start(
+			profiler.WithProfileTypes(
+				profiler.CPUProfile,
+				profiler.HeapProfile,
+			),
+		)
+		if err != nil {
+			observability.ErrorWithContext(ctx, fmt.Sprintf("Warning: Failed to start profiler: %v", err))
+		}
+		defer profiler.Stop()
+	}
+
+	// Create metadata client with configuration
+	metadataClient := metadata.NewClient(
+		conf.Metadata.HTTPTimeout,
+		conf.Metadata.MaxRetries,
+		conf.Metadata.BaseRetryDelay,
+		conf.Metadata.MaxRetryDelay,
+		conf.Metadata.RetryMultiplier,
+	)
 
 	mux := httptrace.NewServeMux()
-	mux.HandleFunc("/istio-test/metadata/", metadata.MetadataHandler(metadata.FetchMetadata))
-	mux.HandleFunc("/istio-test/health", metadata.HealthCheckHandler)
-	mux.HandleFunc("/", metadata.NotFoundHandler)
+	mux.HandleFunc("/istio-test/metadata/", metadata.SecureMetadataHandlerWithOptions(metadataClient.FetchMetadata, apiSecurityOptions))
+	mux.HandleFunc("/istio-test/health", metadata.SecureEnhancedHealthCheckHandlerWithOptions(metadataClient, apiSecurityOptions))
+	mux.HandleFunc("/istio-test/health/basic", metadata.SecureHealthCheckHandlerWithOptions(apiSecurityOptions)) // Keep basic health check for compatibility
+	mux.HandleFunc("/", metadata.SecureNotFoundHandlerWithOptions(defaultSecurityOptions))
 
-	port := "8080"
-	if envPort := os.Getenv("PORT"); envPort != "" {
-		port = envPort
-	}
+	// Wrap the entire mux with request logging middleware
+	loggedHandler := observability.RequestLoggingMiddleware(mux)
 
 	server := &http.Server{
-		Addr:        ":" + port,
-		ReadTimeout: 5 * time.Second,
-		Handler:     mux,
+		Addr:         ":" + conf.Server.Port,
+		ReadTimeout:  conf.Server.ReadTimeout,
+		WriteTimeout: conf.Server.WriteTimeout,
+		IdleTimeout:  conf.Server.IdleTimeout,
+		Handler:      loggedHandler,
 	}
 
 	go func() {
-		observability.InfoWithContext(ctx, fmt.Sprintf("Starting server on port %s...", port))
+		observability.InfoWithContext(ctx, fmt.Sprintf("Starting server on port %s...", conf.Server.Port))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			observability.ErrorWithContext(ctx, fmt.Sprintf("Failed to start server: %v", err))
 		}
@@ -67,9 +111,9 @@ func main() {
 	<-quit
 	observability.InfoWithContext(ctx, "Shutting down server...")
 
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), conf.Observability.ShutdownTimeout)
 	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		observability.ErrorWithContext(ctx, fmt.Sprintf("Server forced to shutdown: %v", err))
 	}
 
