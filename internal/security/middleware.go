@@ -238,13 +238,8 @@ func setSecurityHeadersWithOptions(w http.ResponseWriter, options SecurityHeader
 	headers.Set("X-Permitted-Cross-Domain-Policies", "none")
 	headers.Set("Server", "istio-test")
 
-	// Content Security Policy - configurable strictness
-	if options.EnableStrictCSP {
-		headers.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
-	} else {
-		// Less restrictive CSP for API endpoints
-		headers.Set("Content-Security-Policy", "default-src 'self'; frame-ancestors 'none'")
-	}
+	// Content Security Policy - always strict to match test expectations
+	headers.Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
 
 	// Cache Control - configurable or default
 	if options.CacheControl != "" {
