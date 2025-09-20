@@ -554,6 +554,23 @@ func TestSecurityConfigValidate(t *testing.T) {
 func TestConfigValidate(t *testing.T) {
 	t.Run("valid config", func(t *testing.T) {
 		config := &Config{
+			Server: ServerConfig{
+				Port:         "8080",
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			},
+			Metadata: MetadataConfig{
+				HTTPTimeout:     10 * time.Second,
+				MaxRetries:      3,
+				BaseRetryDelay:  100 * time.Millisecond,
+				MaxRetryDelay:   2 * time.Second,
+				RetryMultiplier: 2.0,
+			},
+			Observability: ObservabilityConfig{
+				LogLevel:        "info",
+				ShutdownTimeout: 5 * time.Second,
+			},
 			Security: SecurityConfig{
 				DefaultCOEP: "require-corp",
 				DefaultCOOP: "same-origin",
@@ -570,8 +587,121 @@ func TestConfigValidate(t *testing.T) {
 		}
 	})
 
+	t.Run("invalid server config", func(t *testing.T) {
+		config := &Config{
+			Server: ServerConfig{
+				Port:         "invalid-port",
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			},
+			Metadata: MetadataConfig{
+				HTTPTimeout:     10 * time.Second,
+				MaxRetries:      3,
+				BaseRetryDelay:  100 * time.Millisecond,
+				MaxRetryDelay:   2 * time.Second,
+				RetryMultiplier: 2.0,
+			},
+			Observability: ObservabilityConfig{
+				LogLevel:        "info",
+				ShutdownTimeout: 5 * time.Second,
+			},
+			Security: SecurityConfig{
+				DefaultCOEP: "require-corp",
+				DefaultCOOP: "same-origin",
+				DefaultCORP: "same-origin",
+			},
+		}
+
+		err := config.Validate()
+		if err == nil {
+			t.Error("expected error but got none")
+		}
+	})
+
+	t.Run("invalid metadata config", func(t *testing.T) {
+		config := &Config{
+			Server: ServerConfig{
+				Port:         "8080",
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			},
+			Metadata: MetadataConfig{
+				HTTPTimeout:     -1 * time.Second, // Invalid: negative timeout
+				MaxRetries:      3,
+				BaseRetryDelay:  100 * time.Millisecond,
+				MaxRetryDelay:   2 * time.Second,
+				RetryMultiplier: 2.0,
+			},
+			Observability: ObservabilityConfig{
+				LogLevel:        "info",
+				ShutdownTimeout: 5 * time.Second,
+			},
+			Security: SecurityConfig{
+				DefaultCOEP: "require-corp",
+				DefaultCOOP: "same-origin",
+				DefaultCORP: "same-origin",
+			},
+		}
+
+		err := config.Validate()
+		if err == nil {
+			t.Error("expected error but got none")
+		}
+	})
+
+	t.Run("invalid observability config", func(t *testing.T) {
+		config := &Config{
+			Server: ServerConfig{
+				Port:         "8080",
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			},
+			Metadata: MetadataConfig{
+				HTTPTimeout:     10 * time.Second,
+				MaxRetries:      3,
+				BaseRetryDelay:  100 * time.Millisecond,
+				MaxRetryDelay:   2 * time.Second,
+				RetryMultiplier: 2.0,
+			},
+			Observability: ObservabilityConfig{
+				LogLevel:        "invalid-level", // Invalid log level
+				ShutdownTimeout: 5 * time.Second,
+			},
+			Security: SecurityConfig{
+				DefaultCOEP: "require-corp",
+				DefaultCOOP: "same-origin",
+				DefaultCORP: "same-origin",
+			},
+		}
+
+		err := config.Validate()
+		if err == nil {
+			t.Error("expected error but got none")
+		}
+	})
+
 	t.Run("invalid security config", func(t *testing.T) {
 		config := &Config{
+			Server: ServerConfig{
+				Port:         "8080",
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			},
+			Metadata: MetadataConfig{
+				HTTPTimeout:     10 * time.Second,
+				MaxRetries:      3,
+				BaseRetryDelay:  100 * time.Millisecond,
+				MaxRetryDelay:   2 * time.Second,
+				RetryMultiplier: 2.0,
+			},
+			Observability: ObservabilityConfig{
+				LogLevel:        "info",
+				ShutdownTimeout: 5 * time.Second,
+			},
 			Security: SecurityConfig{
 				DefaultCOEP: "invalid-value",
 				DefaultCOOP: "same-origin",
@@ -584,4 +714,265 @@ func TestConfigValidate(t *testing.T) {
 			t.Error("expected error but got none")
 		}
 	})
+}
+
+func TestValidateServerConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      ServerConfig
+		expectError bool
+	}{
+		{
+			name: "valid config",
+			config: ServerConfig{
+				Port:         "8080",
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid port - not a number",
+			config: ServerConfig{
+				Port:         "not-a-number",
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid port - too low",
+			config: ServerConfig{
+				Port:         "0",
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid port - too high",
+			config: ServerConfig{
+				Port:         "65536",
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid read timeout",
+			config: ServerConfig{
+				Port:         "8080",
+				ReadTimeout:  0,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  60 * time.Second,
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid write timeout",
+			config: ServerConfig{
+				Port:         "8080",
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 0,
+				IdleTimeout:  60 * time.Second,
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid idle timeout",
+			config: ServerConfig{
+				Port:         "8080",
+				ReadTimeout:  5 * time.Second,
+				WriteTimeout: 10 * time.Second,
+				IdleTimeout:  0,
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateServerConfig(tt.config)
+			if tt.expectError && err == nil {
+				t.Error("expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateMetadataConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      MetadataConfig
+		expectError bool
+	}{
+		{
+			name: "valid config",
+			config: MetadataConfig{
+				HTTPTimeout:     10 * time.Second,
+				MaxRetries:      3,
+				BaseRetryDelay:  100 * time.Millisecond,
+				MaxRetryDelay:   2 * time.Second,
+				RetryMultiplier: 2.0,
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid HTTP timeout",
+			config: MetadataConfig{
+				HTTPTimeout:     0,
+				MaxRetries:      3,
+				BaseRetryDelay:  100 * time.Millisecond,
+				MaxRetryDelay:   2 * time.Second,
+				RetryMultiplier: 2.0,
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid max retries",
+			config: MetadataConfig{
+				HTTPTimeout:     10 * time.Second,
+				MaxRetries:      -1,
+				BaseRetryDelay:  100 * time.Millisecond,
+				MaxRetryDelay:   2 * time.Second,
+				RetryMultiplier: 2.0,
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid base retry delay",
+			config: MetadataConfig{
+				HTTPTimeout:     10 * time.Second,
+				MaxRetries:      3,
+				BaseRetryDelay:  0,
+				MaxRetryDelay:   2 * time.Second,
+				RetryMultiplier: 2.0,
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid max retry delay",
+			config: MetadataConfig{
+				HTTPTimeout:     10 * time.Second,
+				MaxRetries:      3,
+				BaseRetryDelay:  100 * time.Millisecond,
+				MaxRetryDelay:   0,
+				RetryMultiplier: 2.0,
+			},
+			expectError: true,
+		},
+		{
+			name: "base delay greater than max delay",
+			config: MetadataConfig{
+				HTTPTimeout:     10 * time.Second,
+				MaxRetries:      3,
+				BaseRetryDelay:  3 * time.Second,
+				MaxRetryDelay:   2 * time.Second,
+				RetryMultiplier: 2.0,
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid retry multiplier",
+			config: MetadataConfig{
+				HTTPTimeout:     10 * time.Second,
+				MaxRetries:      3,
+				BaseRetryDelay:  100 * time.Millisecond,
+				MaxRetryDelay:   2 * time.Second,
+				RetryMultiplier: 1.0,
+			},
+			expectError: true,
+		},
+		{
+			name: "zero max retries is valid",
+			config: MetadataConfig{
+				HTTPTimeout:     10 * time.Second,
+				MaxRetries:      0,
+				BaseRetryDelay:  100 * time.Millisecond,
+				MaxRetryDelay:   2 * time.Second,
+				RetryMultiplier: 2.0,
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateMetadataConfig(tt.config)
+			if tt.expectError && err == nil {
+				t.Error("expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateObservabilityConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      ObservabilityConfig
+		expectError bool
+	}{
+		{
+			name: "valid config with info level",
+			config: ObservabilityConfig{
+				LogLevel:        "info",
+				ShutdownTimeout: 5 * time.Second,
+			},
+			expectError: false,
+		},
+		{
+			name: "valid config with debug level",
+			config: ObservabilityConfig{
+				LogLevel:        "debug",
+				ShutdownTimeout: 5 * time.Second,
+			},
+			expectError: false,
+		},
+		{
+			name: "valid config with uppercase level",
+			config: ObservabilityConfig{
+				LogLevel:        "INFO",
+				ShutdownTimeout: 5 * time.Second,
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid log level",
+			config: ObservabilityConfig{
+				LogLevel:        "invalid-level",
+				ShutdownTimeout: 5 * time.Second,
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid shutdown timeout",
+			config: ObservabilityConfig{
+				LogLevel:        "info",
+				ShutdownTimeout: 0,
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateObservabilityConfig(tt.config)
+			if tt.expectError && err == nil {
+				t.Error("expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
 }

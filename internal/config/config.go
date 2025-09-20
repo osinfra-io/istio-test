@@ -102,6 +102,15 @@ func validatePolicy(name, value string, allowed []string) error {
 
 // Validate validates the entire configuration
 func (c *Config) Validate() error {
+	if err := validateServerConfig(c.Server); err != nil {
+		return err
+	}
+	if err := validateMetadataConfig(c.Metadata); err != nil {
+		return err
+	}
+	if err := validateObservabilityConfig(c.Observability); err != nil {
+		return err
+	}
 	return c.Security.Validate()
 }
 
@@ -195,4 +204,83 @@ func getBool(key string, defaultValue bool) bool {
 		}
 	}
 	return defaultValue
+}
+
+// validateServerConfig validates ServerConfig fields
+func validateServerConfig(sc ServerConfig) error {
+	// Validate port is a valid port number
+	if port, err := strconv.Atoi(sc.Port); err != nil {
+		return fmt.Errorf("invalid server port '%s': must be a number", sc.Port)
+	} else if port < 1 || port > 65535 {
+		return fmt.Errorf("invalid server port %d: must be between 1 and 65535", port)
+	}
+
+	// Validate timeouts are positive
+	if sc.ReadTimeout <= 0 {
+		return fmt.Errorf("invalid server read timeout: must be positive")
+	}
+	if sc.WriteTimeout <= 0 {
+		return fmt.Errorf("invalid server write timeout: must be positive")
+	}
+	if sc.IdleTimeout <= 0 {
+		return fmt.Errorf("invalid server idle timeout: must be positive")
+	}
+
+	return nil
+}
+
+// validateMetadataConfig validates MetadataConfig fields
+func validateMetadataConfig(mc MetadataConfig) error {
+	// Validate HTTP timeout is positive
+	if mc.HTTPTimeout <= 0 {
+		return fmt.Errorf("invalid metadata HTTP timeout: must be positive")
+	}
+
+	// Validate max retries is non-negative
+	if mc.MaxRetries < 0 {
+		return fmt.Errorf("invalid metadata max retries: must be non-negative")
+	}
+
+	// Validate retry delays are positive
+	if mc.BaseRetryDelay <= 0 {
+		return fmt.Errorf("invalid metadata base retry delay: must be positive")
+	}
+	if mc.MaxRetryDelay <= 0 {
+		return fmt.Errorf("invalid metadata max retry delay: must be positive")
+	}
+
+	// Validate base delay is not greater than max delay
+	if mc.BaseRetryDelay > mc.MaxRetryDelay {
+		return fmt.Errorf("invalid metadata retry delays: base delay (%v) cannot be greater than max delay (%v)", mc.BaseRetryDelay, mc.MaxRetryDelay)
+	}
+
+	// Validate retry multiplier is greater than 1
+	if mc.RetryMultiplier <= 1.0 {
+		return fmt.Errorf("invalid metadata retry multiplier: must be greater than 1.0")
+	}
+
+	return nil
+}
+
+// validateObservabilityConfig validates ObservabilityConfig fields
+func validateObservabilityConfig(oc ObservabilityConfig) error {
+	// Validate log level is one of the standard levels
+	validLogLevels := []string{"debug", "info", "warn", "error", "fatal", "panic"}
+	found := false
+	for _, level := range validLogLevels {
+		if strings.ToLower(oc.LogLevel) == level {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return fmt.Errorf("invalid log level '%s': must be one of %s", oc.LogLevel, strings.Join(validLogLevels, ", "))
+	}
+
+	// Validate shutdown timeout is positive
+	if oc.ShutdownTimeout <= 0 {
+		return fmt.Errorf("invalid shutdown timeout: must be positive")
+	}
+
+	return nil
 }
