@@ -290,9 +290,19 @@ func SecureHealthCheckHandler() http.HandlerFunc {
 	return security.SecureHandler([]string{"GET", "HEAD"}, HealthCheckHandler)
 }
 
+// SecureHealthCheckHandlerWithOptions returns a health check handler with configurable security headers and method validation
+func SecureHealthCheckHandlerWithOptions(options security.SecurityHeadersOptions) http.HandlerFunc {
+	return security.SecureHandlerWithOptions([]string{"GET", "HEAD"}, HealthCheckHandler, options)
+}
+
 // SecureEnhancedHealthCheckHandler returns an enhanced health check handler with security headers and method validation
 func SecureEnhancedHealthCheckHandler(metadataClient *Client) http.HandlerFunc {
 	return security.SecureHandler([]string{"GET", "HEAD"}, EnhancedHealthCheckHandler(metadataClient))
+}
+
+// SecureEnhancedHealthCheckHandlerWithOptions returns an enhanced health check handler with configurable security headers and method validation
+func SecureEnhancedHealthCheckHandlerWithOptions(metadataClient *Client, options security.SecurityHeadersOptions) http.HandlerFunc {
+	return security.SecureHandlerWithOptions([]string{"GET", "HEAD"}, EnhancedHealthCheckHandler(metadataClient), options)
 }
 
 func MetadataHandler(fetchMetadataFunc func(ctx context.Context, url string) (string, error)) http.HandlerFunc {
@@ -357,7 +367,17 @@ func SecureMetadataHandler(fetchMetadataFunc func(ctx context.Context, url strin
 	return security.SecureHandler([]string{"GET"}, MetadataHandler(fetchMetadataFunc))
 }
 
+// SecureMetadataHandlerWithOptions returns a metadata handler with configurable security headers and method validation
+func SecureMetadataHandlerWithOptions(fetchMetadataFunc func(ctx context.Context, url string) (string, error), options security.SecurityHeadersOptions) http.HandlerFunc {
+	return security.SecureHandlerWithOptions([]string{"GET"}, MetadataHandler(fetchMetadataFunc), options)
+}
+
 // SecureNotFoundHandler returns a not found handler with security headers
 func SecureNotFoundHandler() http.HandlerFunc {
 	return security.SecurityMiddlewareFunc(NotFoundHandler)
+}
+
+// SecureNotFoundHandlerWithOptions returns a not found handler with configurable security headers
+func SecureNotFoundHandlerWithOptions(options security.SecurityHeadersOptions) http.HandlerFunc {
+	return security.SecurityMiddlewareFuncWithOptions(NotFoundHandler, options)
 }

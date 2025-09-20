@@ -16,6 +16,9 @@ type Config struct {
 
 	// Observability configuration
 	Observability ObservabilityConfig
+
+	// Security configuration
+	Security SecurityConfig
 }
 
 // ServerConfig holds HTTP server related configuration
@@ -44,6 +47,19 @@ type ObservabilityConfig struct {
 	ShutdownTimeout    time.Duration `json:"shutdown_timeout"`
 }
 
+// SecurityConfig holds security-related configuration
+type SecurityConfig struct {
+	// Default Cross-Origin policies
+	DefaultCOEP string `json:"default_coep"` // Cross-Origin-Embedder-Policy: "", "require-corp", or "credentialless"
+	DefaultCOOP string `json:"default_coop"` // Cross-Origin-Opener-Policy: "same-origin", "same-origin-allow-popups", or "unsafe-none"
+	DefaultCORP string `json:"default_corp"` // Cross-Origin-Resource-Policy: "same-origin", "same-site", or "cross-origin"
+
+	// API-specific policies (less restrictive for public APIs)
+	APICOEP string `json:"api_coep"`
+	APICOOP string `json:"api_coop"`
+	APICORP string `json:"api_corp"`
+}
+
 // Load creates a new Config instance with values from environment variables
 // and sensible defaults
 func Load() *Config {
@@ -67,6 +83,17 @@ func Load() *Config {
 			EnableTracing:      getBool("ENABLE_TRACING", true),
 			EnablePIIRedaction: getBool("ENABLE_PII_REDACTION", false),
 			ShutdownTimeout:    getDuration("SHUTDOWN_TIMEOUT", 5*time.Second),
+		},
+		Security: SecurityConfig{
+			// Default strict policies for sensitive endpoints
+			DefaultCOEP: getEnv("SECURITY_DEFAULT_COEP", "require-corp"),
+			DefaultCOOP: getEnv("SECURITY_DEFAULT_COOP", "same-origin"),
+			DefaultCORP: getEnv("SECURITY_DEFAULT_CORP", "same-origin"),
+
+			// Less restrictive policies for API endpoints
+			APICOEP: getEnv("SECURITY_API_COEP", ""), // Empty means header won't be set
+			APICOOP: getEnv("SECURITY_API_COOP", "same-origin-allow-popups"),
+			APICORP: getEnv("SECURITY_API_CORP", "cross-origin"),
 		},
 	}
 }

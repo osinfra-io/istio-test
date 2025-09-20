@@ -11,6 +11,7 @@ import (
 	"istio-test/internal/config"
 	"istio-test/internal/metadata"
 	"istio-test/internal/observability"
+	"istio-test/internal/security"
 
 	"gopkg.in/DataDog/dd-trace-go.v1/ddtrace/tracer"
 	"gopkg.in/DataDog/dd-trace-go.v1/profiler"
@@ -57,11 +58,25 @@ func main() {
 		conf.Metadata.RetryMultiplier,
 	)
 
+	// Create security options for API endpoints (less restrictive)
+	apiSecurityOptions := security.CustomSecurityOptions(
+		conf.Security.APICOEP,
+		conf.Security.APICOOP,
+		conf.Security.APICORP,
+	)
+
+	// Create security options for default endpoints (more restrictive)
+	defaultSecurityOptions := security.CustomSecurityOptions(
+		conf.Security.DefaultCOEP,
+		conf.Security.DefaultCOOP,
+		conf.Security.DefaultCORP,
+	)
+
 	mux := httptrace.NewServeMux()
-	mux.HandleFunc("/istio-test/metadata/", metadata.SecureMetadataHandler(metadataClient.FetchMetadata))
-	mux.HandleFunc("/istio-test/health", metadata.SecureEnhancedHealthCheckHandler(metadataClient))
-	mux.HandleFunc("/istio-test/health/basic", metadata.SecureHealthCheckHandler()) // Keep basic health check for compatibility
-	mux.HandleFunc("/", metadata.SecureNotFoundHandler())
+	mux.HandleFunc("/istio-test/metadata/", metadata.SecureMetadataHandlerWithOptions(metadataClient.FetchMetadata, apiSecurityOptions))
+	mux.HandleFunc("/istio-test/health", metadata.SecureEnhancedHealthCheckHandlerWithOptions(metadataClient, apiSecurityOptions))
+	mux.HandleFunc("/istio-test/health/basic", metadata.SecureHealthCheckHandlerWithOptions(apiSecurityOptions)) // Keep basic health check for compatibility
+	mux.HandleFunc("/", metadata.SecureNotFoundHandlerWithOptions(defaultSecurityOptions))
 
 	// Wrap the entire mux with request logging middleware
 	loggedHandler := observability.RequestLoggingMiddleware(mux)
