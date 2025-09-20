@@ -352,10 +352,14 @@ func MetadataHandler(fetchMetadataFunc func(ctx context.Context, url string) (st
 		}
 
 		response := map[string]string{metadataType: metadata}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(response); err != nil {
+		var buf bytes.Buffer
+		if err := json.NewEncoder(&buf).Encode(response); err != nil {
 			http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+			return
 		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(buf.Bytes())
 	}
 }
 
