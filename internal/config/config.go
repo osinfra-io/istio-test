@@ -133,7 +133,7 @@ func Load() *Config {
 		},
 		Observability: ObservabilityConfig{
 			LogLevel:           getEnv("LOG_LEVEL", "info"),
-			EnableProfiler:     getBool("ENABLE_PROFILER", false),
+			EnableProfiler:     getBool("ENABLE_PROFILER", true),
 			EnableTracing:      getBool("ENABLE_TRACING", true),
 			EnablePIIRedaction: getBool("ENABLE_PII_REDACTION", true),
 			ShutdownTimeout:    getDuration("SHUTDOWN_TIMEOUT", 5*time.Second),
