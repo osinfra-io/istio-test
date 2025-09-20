@@ -66,6 +66,10 @@ func ErrorWithContext(ctx context.Context, msg string) {
 	log.WithContext(ctx).Error(msg)
 }
 
+func WarnWithContext(ctx context.Context, msg string) {
+	log.WithContext(ctx).Warn(msg)
+}
+
 // responseWrapper wraps http.ResponseWriter to capture response status and size
 type responseWrapper struct {
 	http.ResponseWriter
