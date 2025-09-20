@@ -244,14 +244,14 @@ func TestRequestLoggingMiddleware(t *testing.T) {
 
 func TestRedactRequestFields(t *testing.T) {
 	tests := []struct {
-		name               string
-		enableRedaction    bool
-		rawQuery           string
-		clientIP           string
-		userAgent          string
-		expectedQuery      string
-		expectedClientIP   string
-		expectedUserAgent  string
+		name              string
+		enableRedaction   bool
+		rawQuery          string
+		clientIP          string
+		userAgent         string
+		expectedQuery     string
+		expectedClientIP  string
+		expectedUserAgent string
 	}{
 		{
 			name:              "redaction disabled - returns original values",
