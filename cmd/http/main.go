@@ -7,8 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
+	"istio-test/internal/config"
 	"istio-test/internal/metadata"
 	"istio-test/internal/observability"
 
@@ -21,42 +21,59 @@ import (
 func main() {
 	ctx := context.Background()
 
+	// Load configuration
+	conf := config.Load()
+
 	observability.Init()
 
 	observability.InfoWithContext(ctx, "Application is starting")
 
-	tracer.Start(tracer.WithRuntimeMetrics())
-	defer tracer.Stop()
-
-	err := profiler.Start(
-		profiler.WithProfileTypes(
-			profiler.CPUProfile,
-			profiler.HeapProfile,
-		),
-	)
-	if err != nil {
-		observability.ErrorWithContext(ctx, fmt.Sprintf("Warning: Failed to start profiler: %v", err))
+	if conf.Observability.EnableTracing {
+		tracer.Start(tracer.WithRuntimeMetrics())
+		defer tracer.Stop()
 	}
-	defer profiler.Stop()
+
+	if conf.Observability.EnableProfiler {
+		err := profiler.Start(
+			profiler.WithProfileTypes(
+				profiler.CPUProfile,
+				profiler.HeapProfile,
+			),
+		)
+		if err != nil {
+			observability.ErrorWithContext(ctx, fmt.Sprintf("Warning: Failed to start profiler: %v", err))
+		}
+		defer profiler.Stop()
+	}
+
+	// Create metadata client with configuration
+	metadataClient := metadata.NewClient(
+		conf.Metadata.HTTPTimeout,
+		conf.Metadata.MaxRetries,
+		conf.Metadata.BaseRetryDelay,
+		conf.Metadata.MaxRetryDelay,
+		conf.Metadata.RetryMultiplier,
+	)
 
 	mux := httptrace.NewServeMux()
-	mux.HandleFunc("/istio-test/metadata/", metadata.MetadataHandler(metadata.FetchMetadata))
-	mux.HandleFunc("/istio-test/health", metadata.HealthCheckHandler)
-	mux.HandleFunc("/", metadata.NotFoundHandler)
+	mux.HandleFunc("/istio-test/metadata/", metadata.SecureMetadataHandler(metadataClient.FetchMetadata))
+	mux.HandleFunc("/istio-test/health", metadata.SecureEnhancedHealthCheckHandler(metadataClient))
+	mux.HandleFunc("/istio-test/health/basic", metadata.SecureHealthCheckHandler()) // Keep basic health check for compatibility
+	mux.HandleFunc("/", metadata.SecureNotFoundHandler())
 
-	port := "8080"
-	if envPort := os.Getenv("PORT"); envPort != "" {
-		port = envPort
-	}
+	// Wrap the entire mux with request logging middleware
+	loggedHandler := observability.RequestLoggingMiddleware(mux)
 
 	server := &http.Server{
-		Addr:        ":" + port,
-		ReadTimeout: 5 * time.Second,
-		Handler:     mux,
+		Addr:         ":" + conf.Server.Port,
+		ReadTimeout:  conf.Server.ReadTimeout,
+		WriteTimeout: conf.Server.WriteTimeout,
+		IdleTimeout:  conf.Server.IdleTimeout,
+		Handler:      loggedHandler,
 	}
 
 	go func() {
-		observability.InfoWithContext(ctx, fmt.Sprintf("Starting server on port %s...", port))
+		observability.InfoWithContext(ctx, fmt.Sprintf("Starting server on port %s...", conf.Server.Port))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			observability.ErrorWithContext(ctx, fmt.Sprintf("Failed to start server: %v", err))
 		}
@@ -67,9 +84,9 @@ func main() {
 	<-quit
 	observability.InfoWithContext(ctx, "Shutting down server...")
 
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), conf.Observability.ShutdownTimeout)
 	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.Shutdown(shutdownCtx); err != nil {
 		observability.ErrorWithContext(ctx, fmt.Sprintf("Server forced to shutdown: %v", err))
 	}
 
