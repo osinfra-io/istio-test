@@ -93,7 +93,9 @@ func getDuration(key string, defaultValue time.Duration) time.Duration {
 func getInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
 		if intValue, err := strconv.Atoi(value); err == nil {
-			return intValue
+			if intValue >= 0 {
+				return intValue
+			}
 		}
 	}
 	return defaultValue
