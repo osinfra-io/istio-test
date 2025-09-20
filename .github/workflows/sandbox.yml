@@ -39,6 +39,6 @@ jobs:
             DD_GIT_REPOSITORY_URL=https://github.com/${{ github.repository }}
             DD_GIT_COMMIT_SHA=${{ github.sha }}
       registry: us-docker.pkg.dev
-      service_account: plt-istio-test-github@plt-lz-terraform-tf00-sb.iam.gserviceaccount.com
+      service_account: plt-istio-test-github@plt-lz-backend-tf69-sb.iam.gserviceaccount.com
       tags: us-docker.pkg.dev/plt-lz-services-tf7f-sb/plt-docker-standard/istio-test:${{ github.sha }}
       workload_identity_provider: projects/746490462722/locations/global/workloadIdentityPools/github-actions/providers/github-actions-oidc
