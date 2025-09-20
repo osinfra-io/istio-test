@@ -1,8 +1,10 @@
 package observability
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -79,6 +81,33 @@ func (rw *responseWrapper) Write(data []byte) (int, error) {
 	size, err := rw.ResponseWriter.Write(data)
 	rw.size += size
 	return size, err
+}
+
+// Hijack implements the http.Hijacker interface if the underlying ResponseWriter supports it
+func (rw *responseWrapper) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	hijacker, ok := rw.ResponseWriter.(http.Hijacker)
+	if !ok {
+		return nil, nil, http.ErrNotSupported
+	}
+	return hijacker.Hijack()
+}
+
+// Flush implements the http.Flusher interface if the underlying ResponseWriter supports it
+func (rw *responseWrapper) Flush() {
+	flusher, ok := rw.ResponseWriter.(http.Flusher)
+	if ok {
+		flusher.Flush()
+	}
+	// No-op if flushing is not supported
+}
+
+// Push implements the http.Pusher interface if the underlying ResponseWriter supports it
+func (rw *responseWrapper) Push(target string, opts *http.PushOptions) error {
+	pusher, ok := rw.ResponseWriter.(http.Pusher)
+	if !ok {
+		return http.ErrNotSupported
+	}
+	return pusher.Push(target, opts)
 }
 
 // RequestLoggingMiddleware provides comprehensive request/response logging
