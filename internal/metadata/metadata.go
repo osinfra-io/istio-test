@@ -336,10 +336,9 @@ func MetadataHandler(fetchMetadataFunc func(ctx context.Context, url string) (st
 		metadata, err := fetchMetadataFunc(r.Context(), url)
 		if err != nil {
 			observability.ErrorWithContext(r.Context(), fmt.Sprintf("Failed to fetch metadata: %v", err))
-			http.Error(w, fmt.Sprintf("Failed to fetch metadata: %v", err), http.StatusInternalServerError)
+			http.Error(w, "Failed to fetch metadata", http.StatusBadGateway)
 			return
 		}
-
 		if metadataType == "instance-zone" {
 			instanceZoneParts := strings.Split(metadata, "/")
 			if len(instanceZoneParts) > 0 {
