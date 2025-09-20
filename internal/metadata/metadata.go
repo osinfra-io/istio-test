@@ -189,7 +189,15 @@ func EnhancedHealthCheckHandler(metadataClient *Client) http.HandlerFunc {
 		// Determine overall health status
 		health.Status = determineOverallHealth(health.Checks)
 
-		// Set appropriate response headers and status code
+		// Marshal JSON response first to handle encoding errors before setting status
+		jsonData, err := json.Marshal(health)
+		if err != nil {
+			observability.ErrorWithContext(r.Context(), fmt.Sprintf("Error encoding health response: %v", err))
+			http.Error(w, "Failed to encode health response", http.StatusInternalServerError)
+			return
+		}
+
+		// Set appropriate response headers and status code only after successful encoding
 		w.Header().Set("Content-Type", "application/json")
 		if health.Status == HealthStatusHealthy {
 			w.WriteHeader(http.StatusOK)
@@ -199,9 +207,9 @@ func EnhancedHealthCheckHandler(metadataClient *Client) http.HandlerFunc {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
 
-		if err := json.NewEncoder(w).Encode(health); err != nil {
-			observability.ErrorWithContext(r.Context(), fmt.Sprintf("Error encoding health response: %v", err))
-			http.Error(w, "Failed to encode health response", http.StatusInternalServerError)
+		// Write the pre-encoded JSON data
+		if _, err := w.Write(jsonData); err != nil {
+			observability.ErrorWithContext(r.Context(), fmt.Sprintf("Error writing health response: %v", err))
 		}
 
 		// Log health check result
@@ -310,13 +318,13 @@ func MetadataHandler(fetchMetadataFunc func(ctx context.Context, url string) (st
 	return func(w http.ResponseWriter, r *http.Request) {
 		observability.InfoWithContext(r.Context(), fmt.Sprintf("Received request for %s", r.URL.Path))
 
-	cleanPath := strings.TrimSuffix(r.URL.Path, "/")
-	pathParts := strings.Split(cleanPath, "/")
-	if len(pathParts) != 4 {
-		observability.ErrorWithContext(r.Context(), fmt.Sprintf("Invalid request: %s", r.URL.Path))
-		http.Error(w, "Invalid request: expected /istio-test/metadata/{type}", http.StatusBadRequest)
-		return
-	}
+		cleanPath := strings.TrimSuffix(r.URL.Path, "/")
+		pathParts := strings.Split(cleanPath, "/")
+		if len(pathParts) != 4 {
+			observability.ErrorWithContext(r.Context(), fmt.Sprintf("Invalid request: %s", r.URL.Path))
+			http.Error(w, "Invalid request: expected /istio-test/metadata/{type}", http.StatusBadRequest)
+			return
+		}
 
 		metadataType := pathParts[3]
 		var url string
