@@ -81,7 +81,9 @@ func getEnv(key, defaultValue string) string {
 func getDuration(key string, defaultValue time.Duration) time.Duration {
 	if value := os.Getenv(key); value != "" {
 		if duration, err := time.ParseDuration(value); err == nil {
-			return duration
+			if duration > 0 {
+				return duration
+			}
 		}
 	}
 	return defaultValue
