@@ -103,7 +103,9 @@ func getInt(key string, defaultValue int) int {
 func getFloat(key string, defaultValue float64) float64 {
 	if value := os.Getenv(key); value != "" {
 		if floatValue, err := strconv.ParseFloat(value, 64); err == nil {
-			return floatValue
+			if floatValue > 0 {
+				return floatValue
+			}
 		}
 	}
 	return defaultValue
