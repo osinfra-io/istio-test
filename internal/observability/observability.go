@@ -204,11 +204,12 @@ func getClientIP(r *http.Request) string {
 
 	// Fall back to RemoteAddr
 	ip := r.RemoteAddr
-	// Remove port if present
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		return ip[:idx]
+	// Remove port if present using net.SplitHostPort to handle IPv6 addresses properly
+	if host, _, err := net.SplitHostPort(ip); err == nil {
+		return strings.TrimSpace(host)
 	}
-	return ip
+	// If SplitHostPort fails (no port), use RemoteAddr as-is
+	return strings.TrimSpace(ip)
 }
 
 // getRequestID extracts or generates a request ID for tracing
