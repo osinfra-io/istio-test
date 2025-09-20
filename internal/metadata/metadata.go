@@ -87,10 +87,9 @@ func (c *Client) FetchMetadata(ctx context.Context, url string) (string, error) 
 			return "", fmt.Errorf("failed after %d attempts: %w", c.maxRetries, lastErr)
 		}
 
-		defer resp.Body.Close()
-
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
 			lastErr = fmt.Errorf("failed to get metadata from %s, status code: %d, response: %s", url, resp.StatusCode, string(body))
 
 			// Only retry on 5xx errors or 429 (rate limiting)
@@ -109,6 +108,7 @@ func (c *Client) FetchMetadata(ctx context.Context, url string) (string, error) 
 		}
 
 		metadata, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
 		if err != nil {
 			return "", fmt.Errorf("error reading response body: %w", err)
 		}
