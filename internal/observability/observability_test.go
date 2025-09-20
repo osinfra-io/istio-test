@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -70,7 +71,7 @@ func TestInit(t *testing.T) {
 			log.AddHook(hook)
 
 			// Initialize the logger
-			Init(tt.logLevel)
+			Init(tt.logLevel, Config{EnablePIIRedaction: false})
 
 			// Check if the logger is set to JSON formatter
 			_, ok := log.Formatter.(*logrus.JSONFormatter)
@@ -239,6 +240,77 @@ func TestRequestLoggingMiddleware(t *testing.T) {
 		assert.Equal(t, "client_error", completeEntry.Data["status_class"])
 		assert.Equal(t, logrus.WarnLevel, completeEntry.Level, "Expected warn level for 400 status")
 	})
+}
+
+func TestRedactRequestFields(t *testing.T) {
+	tests := []struct {
+		name               string
+		enableRedaction    bool
+		rawQuery           string
+		clientIP           string
+		userAgent          string
+		expectedQuery      string
+		expectedClientIP   string
+		expectedUserAgent  string
+	}{
+		{
+			name:              "redaction disabled - returns original values",
+			enableRedaction:   false,
+			rawQuery:          "page=1&limit=10&secret=password",
+			clientIP:          "192.168.1.100",
+			userAgent:         "Mozilla/5.0 (Test Browser)",
+			expectedQuery:     "page=1&limit=10&secret=password",
+			expectedClientIP:  "192.168.1.100",
+			expectedUserAgent: "Mozilla/5.0 (Test Browser)",
+		},
+		{
+			name:              "redaction enabled - allowlisted query params",
+			enableRedaction:   true,
+			rawQuery:          "page=1&limit=10&secret=password",
+			clientIP:          "192.168.1.100",
+			userAgent:         "Mozilla/5.0 (Test Browser)",
+			expectedQuery:     "limit=10&page=1&secret=%3Credacted%3E",
+			expectedClientIP:  "192.0.0.0",
+			expectedUserAgent: "Mozilla/5.0 (Test Browser)",
+		},
+		{
+			name:              "redaction enabled - long user agent truncated",
+			enableRedaction:   true,
+			rawQuery:          "",
+			clientIP:          "10.0.0.50",
+			userAgent:         strings.Repeat("A", 150),
+			expectedQuery:     "",
+			expectedClientIP:  "10.0.0.0",
+			expectedUserAgent: strings.Repeat("A", 100),
+		},
+		{
+			name:              "redaction enabled - IPv6 and empty user agent",
+			enableRedaction:   true,
+			rawQuery:          "token=abc123",
+			clientIP:          "2001:db8::1",
+			userAgent:         "",
+			expectedQuery:     "token=%3Credacted%3E",
+			expectedClientIP:  "redacted",
+			expectedUserAgent: "<redacted>",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a test request
+			req := httptest.NewRequest("GET", "http://example.com/test?"+tt.rawQuery, nil)
+			req.Header.Set("User-Agent", tt.userAgent)
+			req.RemoteAddr = tt.clientIP + ":12345"
+
+			cfg := Config{EnablePIIRedaction: tt.enableRedaction}
+
+			sanitizedQuery, sanitizedClientIP, sanitizedUserAgent := redactRequestFields(req, cfg)
+
+			assert.Equal(t, tt.expectedQuery, sanitizedQuery, "Query should match expected")
+			assert.Equal(t, tt.expectedClientIP, sanitizedClientIP, "Client IP should match expected")
+			assert.Equal(t, tt.expectedUserAgent, sanitizedUserAgent, "User Agent should match expected")
+		})
+	}
 }
 
 func TestGetClientIP(t *testing.T) {

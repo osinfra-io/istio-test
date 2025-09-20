@@ -37,10 +37,11 @@ type MetadataConfig struct {
 
 // ObservabilityConfig holds observability related configuration
 type ObservabilityConfig struct {
-	LogLevel        string        `json:"log_level"`
-	EnableProfiler  bool          `json:"enable_profiler"`
-	EnableTracing   bool          `json:"enable_tracing"`
-	ShutdownTimeout time.Duration `json:"shutdown_timeout"`
+	LogLevel           string        `json:"log_level"`
+	EnableProfiler     bool          `json:"enable_profiler"`
+	EnableTracing      bool          `json:"enable_tracing"`
+	EnablePIIRedaction bool          `json:"enable_pii_redaction"`
+	ShutdownTimeout    time.Duration `json:"shutdown_timeout"`
 }
 
 // Load creates a new Config instance with values from environment variables
@@ -61,10 +62,11 @@ func Load() *Config {
 			RetryMultiplier: getFloat("METADATA_RETRY_MULTIPLIER", 2.0),
 		},
 		Observability: ObservabilityConfig{
-			LogLevel:        getEnv("LOG_LEVEL", "info"),
-			EnableProfiler:  getBool("ENABLE_PROFILER", true),
-			EnableTracing:   getBool("ENABLE_TRACING", true),
-			ShutdownTimeout: getDuration("SHUTDOWN_TIMEOUT", 5*time.Second),
+			LogLevel:           getEnv("LOG_LEVEL", "info"),
+			EnableProfiler:     getBool("ENABLE_PROFILER", true),
+			EnableTracing:      getBool("ENABLE_TRACING", true),
+			EnablePIIRedaction: getBool("ENABLE_PII_REDACTION", false),
+			ShutdownTimeout:    getDuration("SHUTDOWN_TIMEOUT", 5*time.Second),
 		},
 	}
 }

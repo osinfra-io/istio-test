@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -17,7 +18,15 @@ import (
 
 var log = logrus.New()
 
-func Init(logLevel string) {
+// Config holds observability configuration
+type Config struct {
+	EnablePIIRedaction bool
+}
+
+// config holds the current observability configuration
+var config Config
+
+func Init(logLevel string, cfg Config) {
 	log.SetFormatter(&logrus.JSONFormatter{})
 	log.Info("Logrus set to JSON formatter")
 
@@ -41,6 +50,9 @@ func Init(logLevel string) {
 	}
 
 	log.SetLevel(level)
+
+	// Store configuration
+	config = cfg
 
 	// Add Datadog context log hook
 	log.AddHook(&dd_logrus.DDContextLogHook{})
@@ -118,18 +130,17 @@ func RequestLoggingMiddleware(next http.Handler) http.Handler {
 		// Wrap the response writer to capture status code and size
 		wrapper := newResponseWrapper(w)
 
-		// Extract client info
-		clientIP := getClientIP(r)
-		userAgent := r.Header.Get("User-Agent")
+		// Extract client info with PII redaction
+		sanitizedQuery, sanitizedClientIP, sanitizedUserAgent := redactRequestFields(r, config)
 
 		// Log incoming request
 		log.WithContext(r.Context()).WithFields(logrus.Fields{
 			"type":           "request_start",
 			"method":         r.Method,
 			"path":           r.URL.Path,
-			"query":          r.URL.RawQuery,
-			"client_ip":      clientIP,
-			"user_agent":     userAgent,
+			"query":          sanitizedQuery,
+			"client_ip":      sanitizedClientIP,
+			"user_agent":     sanitizedUserAgent,
 			"request_id":     getRequestID(r),
 			"content_length": r.ContentLength,
 		}).Info("HTTP request started")
@@ -148,18 +159,18 @@ func RequestLoggingMiddleware(next http.Handler) http.Handler {
 			"type":          "request_complete",
 			"method":        r.Method,
 			"path":          r.URL.Path,
-			"query":         r.URL.RawQuery,
+			"query":         sanitizedQuery,
 			"status":        wrapper.statusCode,
 			"status_class":  getStatusClass(wrapper.statusCode),
 			"duration_ms":   float64(duration.Nanoseconds()) / 1000000.0,
 			"response_size": wrapper.size,
-			"client_ip":     clientIP,
-			"user_agent":    userAgent,
+			"client_ip":     sanitizedClientIP,
+			"user_agent":    sanitizedUserAgent,
 			"request_id":    getRequestID(r),
 		})
 
 		message := fmt.Sprintf("HTTP %s %s - %d - %v - %s",
-			r.Method, r.URL.Path, wrapper.statusCode, duration, clientIP)
+			r.Method, r.URL.Path, wrapper.statusCode, duration, sanitizedClientIP)
 
 		switch logLevel {
 		case logrus.ErrorLevel:
@@ -232,6 +243,57 @@ func getStatusClass(statusCode int) string {
 	default:
 		return "unknown"
 	}
+}
+
+// redactRequestFields sanitizes request fields to remove PII
+// Returns sanitized query params, client IP, and user agent
+func redactRequestFields(r *http.Request, cfg Config) (string, string, string) {
+	if !cfg.EnablePIIRedaction {
+		// Return original values when redaction is disabled
+		return r.URL.RawQuery, getClientIP(r), r.Header.Get("User-Agent")
+	}
+
+	// Redact query parameters - allowlist only "page" and "limit"
+	var sanitizedQuery string
+	if r.URL.RawQuery != "" {
+		queryValues, err := url.ParseQuery(r.URL.RawQuery)
+		if err != nil {
+			sanitizedQuery = "<invalid_query>"
+		} else {
+			sanitizedParams := url.Values{}
+			for key, values := range queryValues {
+				if key == "page" || key == "limit" {
+					sanitizedParams[key] = values
+				} else {
+					sanitizedParams[key] = []string{"<redacted>"}
+				}
+			}
+			sanitizedQuery = sanitizedParams.Encode()
+		}
+	}
+
+	// Redact client IP - return first octet + ".0.0.0" for IPv4, or "redacted" for others
+	clientIP := getClientIP(r)
+	sanitizedIP := "redacted"
+	if strings.Contains(clientIP, ".") && !strings.Contains(clientIP, ":") {
+		// Looks like IPv4
+		parts := strings.Split(clientIP, ".")
+		if len(parts) == 4 {
+			sanitizedIP = parts[0] + ".0.0.0"
+		}
+	}
+
+	// Redact user agent - truncate to 100 chars max and replace disallowed values
+	userAgent := r.Header.Get("User-Agent")
+	sanitizedUserAgent := userAgent
+	if len(userAgent) > 100 {
+		sanitizedUserAgent = userAgent[:100]
+	}
+	if sanitizedUserAgent == "" {
+		sanitizedUserAgent = "<redacted>"
+	}
+
+	return sanitizedQuery, sanitizedIP, sanitizedUserAgent
 }
 
 // determineLogLevel determines the appropriate log level based on response status and duration

@@ -24,7 +24,9 @@ func main() {
 	// Load configuration
 	conf := config.Load()
 
-	observability.Init(conf.Observability.LogLevel)
+	observability.Init(conf.Observability.LogLevel, observability.Config{
+		EnablePIIRedaction: conf.Observability.EnablePIIRedaction,
+	})
 
 	observability.InfoWithContext(ctx, "Application is starting")
 
