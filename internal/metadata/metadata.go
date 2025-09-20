@@ -309,12 +309,13 @@ func MetadataHandler(fetchMetadataFunc func(ctx context.Context, url string) (st
 	return func(w http.ResponseWriter, r *http.Request) {
 		observability.InfoWithContext(r.Context(), fmt.Sprintf("Received request for %s", r.URL.Path))
 
-		pathParts := strings.Split(r.URL.Path, "/")
-		if len(pathParts) != 4 {
-			observability.ErrorWithContext(r.Context(), fmt.Sprintf("Invalid request: %s", r.URL.Path))
-			http.Error(w, "Invalid request: expected /istio-test/metadata/{type}", http.StatusBadRequest)
-			return
-		}
+	cleanPath := strings.TrimSuffix(r.URL.Path, "/")
+	pathParts := strings.Split(cleanPath, "/")
+	if len(pathParts) != 4 {
+		observability.ErrorWithContext(r.Context(), fmt.Sprintf("Invalid request: %s", r.URL.Path))
+		http.Error(w, "Invalid request: expected /istio-test/metadata/{type}", http.StatusBadRequest)
+		return
+	}
 
 		metadataType := pathParts[3]
 		var url string
