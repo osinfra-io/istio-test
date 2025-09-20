@@ -1,3 +1,42 @@
+// Package security provides configurable HTTP security middleware with flexible Cross-Origin policies.
+//
+// # Common Cross-Origin Policy Combinations
+//
+// For Public APIs (maximum compatibility):
+//   - COEP: "" (not set) - Allows cross-origin requests without restrictions
+//   - COOP: "unsafe-none" - Most permissive for public APIs
+//   - CORP: "cross-origin" - Allows all cross-origin requests
+//     Use: PublicAPISecurityOptions()
+//
+// For Internal/Private APIs (balanced security):
+//   - COEP: "" (not set) - API compatibility
+//   - COOP: "same-origin-allow-popups" - Allows same-origin + popups
+//   - CORP: "same-site" - Restricts to same-site requests
+//     Use: InternalAPISecurityOptions()
+//
+// For Static Content (content security):
+//   - COEP: "require-corp" - Requires CORP header on embedded resources
+//   - COOP: "same-origin" - Isolates browsing context
+//   - CORP: "cross-origin" - Allows cross-origin for assets like images/CSS
+//     Use: StaticContentSecurityOptions()
+//
+// For Maximum Security (strict isolation):
+//   - COEP: "require-corp" - Requires CORP header
+//   - COOP: "same-origin" - Strict same-origin policy
+//   - CORP: "same-origin" - Only allows same-origin requests
+//     Use: StrictSecurityOptions()
+//
+// # Configuration via Environment Variables
+//
+// Default policies (for sensitive endpoints):
+//   - SECURITY_DEFAULT_COEP=require-corp
+//   - SECURITY_DEFAULT_COOP=same-origin
+//   - SECURITY_DEFAULT_CORP=same-origin
+//
+// API policies (for public endpoints):
+//   - SECURITY_API_COEP= (empty, header not set)
+//   - SECURITY_API_COOP=same-origin-allow-popups
+//   - SECURITY_API_CORP=cross-origin
 package security
 
 import (
@@ -46,6 +85,42 @@ func CustomSecurityOptions(coep, coop, corp string) SecurityHeadersOptions {
 		CORP:            corp,
 		EnableStrictCSP: false, // Default to less strict for custom configs
 		CacheControl:    "",
+	}
+}
+
+// PublicAPISecurityOptions returns security options optimized for public APIs
+// These are the most permissive settings suitable for publicly accessible endpoints
+func PublicAPISecurityOptions() SecurityHeadersOptions {
+	return SecurityHeadersOptions{
+		COEP:            "",             // Don't set COEP to avoid blocking cross-origin requests
+		COOP:            "unsafe-none",  // Most permissive for public APIs
+		CORP:            "cross-origin", // Allow all cross-origin requests
+		EnableStrictCSP: false,
+		CacheControl:    "public, max-age=300", // Allow caching for public APIs
+	}
+}
+
+// InternalAPISecurityOptions returns security options for internal/private APIs
+// More restrictive than public APIs but allows same-site access
+func InternalAPISecurityOptions() SecurityHeadersOptions {
+	return SecurityHeadersOptions{
+		COEP:            "", // Don't set COEP for API compatibility
+		COOP:            "same-origin-allow-popups",
+		CORP:            "same-site", // Allow same-site but not arbitrary cross-origin
+		EnableStrictCSP: false,
+		CacheControl:    "", // Use default no-cache
+	}
+}
+
+// StaticContentSecurityOptions returns security options for static content
+// Balanced security for serving static resources
+func StaticContentSecurityOptions() SecurityHeadersOptions {
+	return SecurityHeadersOptions{
+		COEP:            "require-corp", // Require CORP for embedded content
+		COOP:            "same-origin",
+		CORP:            "cross-origin",             // Allow cross-origin for static assets
+		EnableStrictCSP: true,                       // Strict CSP for static content
+		CacheControl:    "public, max-age=31536000", // Long-term caching for static content
 	}
 }
 

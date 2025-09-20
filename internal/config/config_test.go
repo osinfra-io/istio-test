@@ -478,3 +478,110 @@ func TestGetBool(t *testing.T) {
 		})
 	}
 }
+
+func TestSecurityConfigValidate(t *testing.T) {
+	tests := []struct {
+		name        string
+		config      SecurityConfig
+		expectError bool
+	}{
+		{
+			name: "valid config",
+			config: SecurityConfig{
+				DefaultCOEP: "require-corp",
+				DefaultCOOP: "same-origin",
+				DefaultCORP: "same-origin",
+				APICOEP:     "",
+				APICOOP:     "same-origin-allow-popups",
+				APICORP:     "cross-origin",
+			},
+			expectError: false,
+		},
+		{
+			name: "invalid COEP",
+			config: SecurityConfig{
+				DefaultCOEP: "invalid-value",
+				DefaultCOOP: "same-origin",
+				DefaultCORP: "same-origin",
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid COOP",
+			config: SecurityConfig{
+				DefaultCOEP: "",
+				DefaultCOOP: "invalid-value",
+				DefaultCORP: "same-origin",
+			},
+			expectError: true,
+		},
+		{
+			name: "invalid CORP",
+			config: SecurityConfig{
+				DefaultCOEP: "",
+				DefaultCOOP: "same-origin",
+				DefaultCORP: "invalid-value",
+			},
+			expectError: true,
+		},
+		{
+			name: "empty values are valid",
+			config: SecurityConfig{
+				DefaultCOEP: "",
+				DefaultCOOP: "same-origin",
+				DefaultCORP: "same-origin",
+				APICOEP:     "",
+				APICOOP:     "unsafe-none",
+				APICORP:     "",
+			},
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.expectError && err == nil {
+				t.Error("expected error but got none")
+			}
+			if !tt.expectError && err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestConfigValidate(t *testing.T) {
+	t.Run("valid config", func(t *testing.T) {
+		config := &Config{
+			Security: SecurityConfig{
+				DefaultCOEP: "require-corp",
+				DefaultCOOP: "same-origin",
+				DefaultCORP: "same-origin",
+				APICOEP:     "",
+				APICOOP:     "same-origin-allow-popups",
+				APICORP:     "cross-origin",
+			},
+		}
+
+		err := config.Validate()
+		if err != nil {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("invalid security config", func(t *testing.T) {
+		config := &Config{
+			Security: SecurityConfig{
+				DefaultCOEP: "invalid-value",
+				DefaultCOOP: "same-origin",
+				DefaultCORP: "same-origin",
+			},
+		}
+
+		err := config.Validate()
+		if err == nil {
+			t.Error("expected error but got none")
+		}
+	})
+}

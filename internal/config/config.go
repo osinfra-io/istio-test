@@ -1,8 +1,10 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -58,6 +60,49 @@ type SecurityConfig struct {
 	APICOEP string `json:"api_coep"`
 	APICOOP string `json:"api_coop"`
 	APICORP string `json:"api_corp"`
+}
+
+// Validate validates the SecurityConfig values
+func (sc SecurityConfig) Validate() error {
+	validCOEP := []string{"", "require-corp", "credentialless"}
+	validCOOP := []string{"", "same-origin", "same-origin-allow-popups", "unsafe-none"}
+	validCORP := []string{"", "same-origin", "same-site", "cross-origin"}
+
+	if err := validatePolicy("DefaultCOEP", sc.DefaultCOEP, validCOEP); err != nil {
+		return err
+	}
+	if err := validatePolicy("DefaultCOOP", sc.DefaultCOOP, validCOOP); err != nil {
+		return err
+	}
+	if err := validatePolicy("DefaultCORP", sc.DefaultCORP, validCORP); err != nil {
+		return err
+	}
+	if err := validatePolicy("APICOEP", sc.APICOEP, validCOEP); err != nil {
+		return err
+	}
+	if err := validatePolicy("APICOOP", sc.APICOOP, validCOOP); err != nil {
+		return err
+	}
+	if err := validatePolicy("APICORP", sc.APICORP, validCORP); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validatePolicy validates a single policy value against allowed values
+func validatePolicy(name, value string, allowed []string) error {
+	for _, a := range allowed {
+		if value == a {
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid %s value '%s', allowed values: %s", name, value, strings.Join(allowed, ", "))
+}
+
+// Validate validates the entire configuration
+func (c *Config) Validate() error {
+	return c.Security.Validate()
 }
 
 // Load creates a new Config instance with values from environment variables

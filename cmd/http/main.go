@@ -25,11 +25,35 @@ func main() {
 	// Load configuration
 	conf := config.Load()
 
+	// Validate configuration
+	if err := conf.Validate(); err != nil {
+		fmt.Fprintf(os.Stderr, "Configuration validation failed: %v\n", err)
+		os.Exit(1)
+	}
+
 	observability.Init(conf.Observability.LogLevel, observability.Config{
 		EnablePIIRedaction: conf.Observability.EnablePIIRedaction,
 	})
 
 	observability.InfoWithContext(ctx, "Application is starting")
+
+	// Create security options once at startup for better performance
+	apiSecurityOptions := security.CustomSecurityOptions(
+		conf.Security.APICOEP,
+		conf.Security.APICOOP,
+		conf.Security.APICORP,
+	)
+
+	defaultSecurityOptions := security.CustomSecurityOptions(
+		conf.Security.DefaultCOEP,
+		conf.Security.DefaultCOOP,
+		conf.Security.DefaultCORP,
+	)
+
+	// Log security policy configuration for observability
+	observability.InfoWithContext(ctx, fmt.Sprintf("Security policies configured - API: COEP='%s' COOP='%s' CORP='%s', Default: COEP='%s' COOP='%s' CORP='%s'",
+		conf.Security.APICOEP, conf.Security.APICOOP, conf.Security.APICORP,
+		conf.Security.DefaultCOEP, conf.Security.DefaultCOOP, conf.Security.DefaultCORP))
 
 	if conf.Observability.EnableTracing {
 		tracer.Start(tracer.WithRuntimeMetrics())
@@ -56,20 +80,6 @@ func main() {
 		conf.Metadata.BaseRetryDelay,
 		conf.Metadata.MaxRetryDelay,
 		conf.Metadata.RetryMultiplier,
-	)
-
-	// Create security options for API endpoints (less restrictive)
-	apiSecurityOptions := security.CustomSecurityOptions(
-		conf.Security.APICOEP,
-		conf.Security.APICOOP,
-		conf.Security.APICORP,
-	)
-
-	// Create security options for default endpoints (more restrictive)
-	defaultSecurityOptions := security.CustomSecurityOptions(
-		conf.Security.DefaultCOEP,
-		conf.Security.DefaultCOOP,
-		conf.Security.DefaultCORP,
 	)
 
 	mux := httptrace.NewServeMux()
