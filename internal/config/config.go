@@ -81,7 +81,9 @@ func getEnv(key, defaultValue string) string {
 func getDuration(key string, defaultValue time.Duration) time.Duration {
 	if value := os.Getenv(key); value != "" {
 		if duration, err := time.ParseDuration(value); err == nil {
-			return duration
+			if duration > 0 {
+				return duration
+			}
 		}
 	}
 	return defaultValue
@@ -101,7 +103,9 @@ func getInt(key string, defaultValue int) int {
 func getFloat(key string, defaultValue float64) float64 {
 	if value := os.Getenv(key); value != "" {
 		if floatValue, err := strconv.ParseFloat(value, 64); err == nil {
-			return floatValue
+			if floatValue > 0 {
+				return floatValue
+			}
 		}
 	}
 	return defaultValue
