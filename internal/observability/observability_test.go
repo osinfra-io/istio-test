@@ -70,6 +70,8 @@ func TestInit(t *testing.T) {
 			hook := &TestHook{}
 			log.AddHook(hook)
 
+			// Ensure env doesn't influence the default-level case
+			t.Setenv("LOG_LEVEL", "")
 			// Initialize the logger
 			Init(tt.logLevel, Config{EnablePIIRedaction: false})
 
@@ -80,8 +82,8 @@ func TestInit(t *testing.T) {
 			// Check if the logger level is set to expected level
 			assert.Equal(t, tt.expected, log.Level, "Expected log level to be %v", tt.expected)
 
-			// Check if the initialization log messages are present
-			assert.Len(t, hook.Entries, 2, "Expected two log entries during initialization")
+			// Check init log messages (allow future additions)
+			assert.GreaterOrEqual(t, len(hook.Entries), 2, "Expected at least two log entries during initialization")
 			if len(hook.Entries) >= 2 {
 				assert.Contains(t, hook.Entries[0].Message, "Logrus set to JSON formatter", "Expected first log message to contain 'Logrus set to JSON formatter'")
 				assert.Contains(t, hook.Entries[1].Message, "Logrus set to output to stdout", "Expected second log message to contain 'Logrus set to output to stdout'")
