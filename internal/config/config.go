@@ -265,7 +265,7 @@ func validateMetadataConfig(mc MetadataConfig) error {
 // validateObservabilityConfig validates ObservabilityConfig fields
 func validateObservabilityConfig(oc ObservabilityConfig) error {
 	// Validate log level is one of the standard levels
-	validLogLevels := []string{"debug", "info", "warn", "error", "fatal", "panic"}
+	validLogLevels := []string{"trace", "debug", "info", "warn", "warning", "error", "fatal", "panic"}
 	found := false
 	for _, level := range validLogLevels {
 		if strings.ToLower(oc.LogLevel) == level {
@@ -276,7 +276,6 @@ func validateObservabilityConfig(oc ObservabilityConfig) error {
 	if !found {
 		return fmt.Errorf("invalid log level '%s': must be one of %s", oc.LogLevel, strings.Join(validLogLevels, ", "))
 	}
-
 	// Validate shutdown timeout is positive
 	if oc.ShutdownTimeout <= 0 {
 		return fmt.Errorf("invalid shutdown timeout: must be positive")
