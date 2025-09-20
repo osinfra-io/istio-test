@@ -24,7 +24,7 @@ func main() {
 	// Load configuration
 	conf := config.Load()
 
-	observability.Init()
+	observability.Init(conf.Observability.LogLevel)
 
 	observability.InfoWithContext(ctx, "Application is starting")
 

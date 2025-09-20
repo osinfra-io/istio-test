@@ -15,7 +15,7 @@ import (
 
 var log = logrus.New()
 
-func Init() {
+func Init(logLevel string) {
 	log.SetFormatter(&logrus.JSONFormatter{})
 	log.Info("Logrus set to JSON formatter")
 
@@ -23,8 +23,16 @@ func Init() {
 	log.SetOutput(os.Stdout)
 	log.Info("Logrus set to output to stdout")
 
-	// Only log the info severity or above
-	level, err := logrus.ParseLevel(os.Getenv("LOG_LEVEL"))
+	// Parse the provided log level, fallback to environment variable if empty, then to InfoLevel
+	var level logrus.Level
+	var err error
+
+	if logLevel != "" {
+		level, err = logrus.ParseLevel(logLevel)
+	} else {
+		// Fallback to environment variable for backward compatibility
+		level, err = logrus.ParseLevel(os.Getenv("LOG_LEVEL"))
+	}
 
 	if err != nil {
 		level = logrus.InfoLevel

@@ -26,24 +26,70 @@ func (hook *TestHook) Fire(entry *logrus.Entry) error {
 }
 
 func TestInit(t *testing.T) {
-	// Add a test hook to capture log entries
-	hook := &TestHook{}
-	log.AddHook(hook)
+	tests := []struct {
+		name     string
+		logLevel string
+		expected logrus.Level
+	}{
+		{
+			name:     "default log level (empty string)",
+			logLevel: "",
+			expected: logrus.InfoLevel,
+		},
+		{
+			name:     "debug log level",
+			logLevel: "debug",
+			expected: logrus.DebugLevel,
+		},
+		{
+			name:     "warn log level",
+			logLevel: "warn",
+			expected: logrus.WarnLevel,
+		},
+		{
+			name:     "error log level",
+			logLevel: "error",
+			expected: logrus.ErrorLevel,
+		},
+		{
+			name:     "invalid log level",
+			logLevel: "invalid",
+			expected: logrus.InfoLevel,
+		},
+	}
 
-	// Initialize the logger
-	Init()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a fresh logger instance for testing to avoid interference
+			testLogger := logrus.New()
+			originalLogger := log
+			log = testLogger // Temporarily replace the global logger
 
-	// Check if the logger is set to JSON formatter
-	_, ok := log.Formatter.(*logrus.JSONFormatter)
-	assert.True(t, ok, "Expected JSONFormatter")
+			// Add a test hook to capture log entries
+			hook := &TestHook{}
+			log.AddHook(hook)
 
-	// Check if the logger level is set to InfoLevel
-	assert.Equal(t, logrus.InfoLevel, log.Level, "Expected log level to be InfoLevel")
+			// Initialize the logger
+			Init(tt.logLevel)
 
-	// Check if the initialization log messages are present
-	assert.Len(t, hook.Entries, 2, "Expected two log entries during initialization")
-	assert.Contains(t, hook.Entries[0].Message, "Logrus set to JSON formatter", "Expected first log message to contain 'Logrus set to JSON formatter'")
-	assert.Contains(t, hook.Entries[1].Message, "Logrus set to output to stdout", "Expected second log message to contain 'Logrus set to output to stdout'")
+			// Check if the logger is set to JSON formatter
+			_, ok := log.Formatter.(*logrus.JSONFormatter)
+			assert.True(t, ok, "Expected JSONFormatter")
+
+			// Check if the logger level is set to expected level
+			assert.Equal(t, tt.expected, log.Level, "Expected log level to be %v", tt.expected)
+
+			// Check if the initialization log messages are present
+			assert.Len(t, hook.Entries, 2, "Expected two log entries during initialization")
+			if len(hook.Entries) >= 2 {
+				assert.Contains(t, hook.Entries[0].Message, "Logrus set to JSON formatter", "Expected first log message to contain 'Logrus set to JSON formatter'")
+				assert.Contains(t, hook.Entries[1].Message, "Logrus set to output to stdout", "Expected second log message to contain 'Logrus set to output to stdout'")
+			}
+
+			// Restore the original logger
+			log = originalLogger
+		})
+	}
 }
 
 func TestInfoWithContext(t *testing.T) {
