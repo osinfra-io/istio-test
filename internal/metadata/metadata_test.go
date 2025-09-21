@@ -111,12 +111,34 @@ func TestEnhancedHealthCheckHandler(t *testing.T) {
 		assert.Contains(t, healthResp.Checks, "metadata_service")
 		assert.Contains(t, healthResp.Checks, "http_server")
 		assert.NotEmpty(t, healthResp.Uptime)
-		assert.Equal(t, "1.0.0", healthResp.Version)
+		assert.Equal(t, "dev", healthResp.Version) // Default version during testing
 		assert.NotZero(t, healthResp.Timestamp)
 
 		// HTTP server check should always be healthy since we're responding
 		assert.Equal(t, HealthStatusHealthy, healthResp.Checks["http_server"].Status)
 		assert.Contains(t, healthResp.Checks["http_server"].Message, "responding")
+	})
+}
+
+func TestGetVersion(t *testing.T) {
+	t.Run("default version", func(t *testing.T) {
+		// Reset version to default for testing
+		originalVersion := version
+		version = "dev"
+		defer func() { version = originalVersion }()
+
+		result := getVersion()
+		assert.Equal(t, "dev", result)
+	})
+
+	t.Run("custom version", func(t *testing.T) {
+		// Set a custom version
+		originalVersion := version
+		version = "v1.2.3"
+		defer func() { version = originalVersion }()
+
+		result := getVersion()
+		assert.Equal(t, "v1.2.3", result)
 	})
 }
 
