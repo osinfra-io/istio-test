@@ -151,6 +151,14 @@ type HealthCheck struct {
 
 var startTime = time.Now()
 
+// Build-time version variable (set via ldflags during build)
+var version = "dev"
+
+// getVersion returns the application version
+func getVersion() string {
+	return version
+}
+
 func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	// Set content type for health check
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -170,7 +178,7 @@ func EnhancedHealthCheckHandler(metadataClient *Client) http.HandlerFunc {
 			Status:    HealthStatusHealthy,
 			Timestamp: time.Now().UTC(),
 			Uptime:    time.Since(startTime).String(),
-			Version:   "1.0.0", // TODO: Get from build info or environment
+			Version:   getVersion(),
 			Checks:    make(map[string]HealthCheck),
 		}
 
