@@ -24,6 +24,13 @@ jobs:
         with:
           go-version: '^1.25'
 
+      - name: Configure Datadog Test Optimization
+        uses: datadog/test-visibility-github-action@v2.4.1
+        with:
+          api_key: ${{ secrets.DATADOG_API_KEY }}
+          languages: go
+          service: istio-test
+
       - name: Run tests
         run: go test ./...
 
